@@ -2,6 +2,8 @@
 """ Console Module """
 import cmd
 import sys
+import shlex
+import ast
 from models.base_model import BaseModel
 from models.__init__ import storage
 from models.user import User
@@ -30,10 +32,10 @@ class HBNBCommand(cmd.Cmd):
              'latitude': float, 'longitude': float
             }
 
-    # def preloop(self):
-    #    """Prints if isatty is false"""
-    #    if not sys.__stdin__.isatty():
-    #        print('(hbnb) ', end='')
+    def preloop(self):
+        """Prints if isatty is false"""
+        if not sys.__stdin__.isatty():
+            print('(hbnb)')
 
     def precmd(self, line):
         """Reformat command line for advanced command syntax.
@@ -115,21 +117,87 @@ class HBNBCommand(cmd.Cmd):
 
     def do_create(self, args):
         """ Create an object of any class"""
-        argv = args.split(' ')
-        if not argv[0]:
-            print("** class name missing **")
+
+        try:
+            if not args:
+                print("** class name missing **")
+                return
+
+
+            class_name = args.split(" ")[0]
+
+            if class_name not in ["BaseModel", "User", "Place", "State", "City",
+                                  "Amenity", "Review"]:
+                print("** class doesn't exist **")
+                return
+
+            kwargs = {}
+            commands = args.split(" ")
+            for i in range(1, len(commands)):
+
+                key = commands[i].split("=")[0]
+                value = commands[i].split("=")[1]
+                #key, value = tuple(commands[i].split("="))
+                if value.startswith('"'):
+                    value = value.strip('"').replace("_", " ")
+                else:
+                    try:
+                        value = eval(value)
+                    except (SyntaxError, NameError):
+                        continue
+                kwargs[key] = value
+
+            if kwargs == {}:
+                new_instance = eval(class_name)()
+            else:
+                new_instance = eval(class_name)(**kwargs)
+            storage.new(new_instance)
+            print(new_instance.id)
+            storage.save()
+        except ValueError:
+            print(ValueError)
             return
-        elif argv[0] not in HBNBCommand.classes:
-            print("** class doesn't exist **")
-            return
-        kwargs = {}
-        for param in argv[1:]:
-            my_param = param.split('=')
-            my_param[1] = my_param[1].replace('_', ' ')
-            kwargs[my_param[0]] = eval(my_param[1])
-        new_instance = HBNBCommand.classes[argv[0]](**kwargs)
-        print(new_instance.id)
-        new_instance.save()
+
+        #try:
+            # Get the class dynamically using globals()
+            #model_class = globals()[class_name]
+        #except KeyError:
+            #print("** class doesn't exist **")
+            #return
+
+        # Create an instance of the specified class
+        #new_instance = model_class()
+
+        #for param in params:
+            #try:
+                #key, value = param.split('=')
+                #key = key.replace('_', ' ')  # Replace underscores with spaces
+                #value = value.replace('"', '').replace('_', ' ')
+
+                # Use ast.literal_eval to safely evaluate the value
+                #parsed_value = ast.literal_eval(value)
+                #if hasattr(new_instance, key):
+                    #setattr(new_instance, key, parsed_value)
+                #else:
+                    #print(f"Atrribute '{key}' does not exist in class '{class_name}'")
+            #except (ValueError, SyntaxError, TypeError) as e:
+                #print(f"Error setting attribute: {e}")
+                #continue
+
+        #try:
+            # Save the instance
+            #new_instance.save()
+            #print(new_instance.id)
+        #except Exception as e:
+            #print(f"Error saving instance: {e}")
+
+        # elif args not in HBNBCommand.classes:
+        #     print("** class doesn't exist **")
+        #     return
+        # new_instance = HBNBCommand.classes[args]()
+        # storage.save()
+        # print(new_instance.id)
+        # storage.save()
 
     def help_create(self):
         """ Help information for the create method """
@@ -205,19 +273,20 @@ class HBNBCommand(cmd.Cmd):
     def do_all(self, args):
         """ Shows all objects, or all objects of a class"""
         print_list = []
+
         if args:
             args = args.split(' ')[0]  # remove possible trailing args
             if args not in HBNBCommand.classes:
                 print("** class doesn't exist **")
                 return
-            for k, v in storage.all(args).items():
+            for k, v in storage._FileStorage__objects.items():
                 if k.split('.')[0] == args:
                     print_list.append(str(v))
         else:
-            for k, v in storage.all().items():
+            for k, v in storage._FileStorage__objects.items():
                 print_list.append(str(v))
-        if print_list:
-            print(print_list)
+
+        print(print_list)
 
     def help_all(self):
         """ Help information for the all command """
